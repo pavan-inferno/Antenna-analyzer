@@ -16,7 +16,7 @@ by pavan.inferno
 
 
 //TFT screen pins
-#define cs_tft   10
+#define cs_tft   7 // not default, this involves some soldering on the TFT shield
 #define dc   8
 #define rst  9
 #define mosi 11
