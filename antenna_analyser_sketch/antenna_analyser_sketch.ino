@@ -178,15 +178,29 @@ void setup() {
       // as it makes device useful without controls
       // just press reset on Nano to restart measurement and clear minimum values
   Serial.println("Sweeping bands ");
-  Sweep_bands();
+//  Sweep_bands();
   Serial.println("Reporting bands ");
-  Sweep_report();
+//  Sweep_report();
   Serial.println("Sweeping and reporting done !");
   
   screen.setCursor(0,100);
-  screen.print("Do you want to continue with frequency sweep ?");
+  screen.println("Which band ?");
+  int temp_bandno = 0;
   while(CheckJoystick()!= Press)
   {
+    screen.fillRect(0,110,40,10,ST7735_BLACK);
+    screen.setCursor(0,110);
+    screen.print(hfbands[temp_bandno][0]);
+    screen.print('m');
+    if (CheckJoystick()== Left)
+      temp_bandno--;
+    if (CheckJoystick()== Right)
+      temp_bandno++;
+    delay(200);
+    if (temp_bandno==8)
+      temp_bandno=0;
+    if (temp_bandno==-1)
+      temp_bandno=7;
   }
 
   //Set black background
@@ -472,7 +486,12 @@ double Get_VSWR(){
     }
     FWD=FWD5/5;  //   carry out averaging calc
     REV=REV5/5;
-    
+
+    Serial.print(FWD);
+    Serial.print(',');
+    Serial.print(REV);
+    Serial.print(',');
+   
     if(REV>=FWD){
       // To avoid a divide by zero or negative VSWR then set to 0
       temp_VSWR = 0;
