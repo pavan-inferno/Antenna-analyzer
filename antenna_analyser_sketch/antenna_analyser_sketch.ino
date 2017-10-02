@@ -16,7 +16,7 @@ by pavan.inferno
 
 
 //TFT screen pins
-#define cs_tft   7 // not default, this involves some soldering on the TFT shield
+#define cs_tft   10 // 7 not default, this involves some soldering on the TFT shield
 #define dc   8
 #define rst  9
 #define mosi 11
@@ -86,6 +86,8 @@ int band_choice = 0; // doesn't need to be zeroed as this happens during initial
 
 int graph_array [150];          // storage array for single graph - try storing vswr values as ints (after multiplying by 100) to save memory
 
+uint8_t vswr[sz{0}];
+
 #define pulseHigh(pin) {digitalWrite(pin, HIGH); digitalWrite(pin, LOW); }
 
 
@@ -101,12 +103,12 @@ void setup() {
   Serial.begin(115200);
 
   //Configure DDS pins
-  pinMode(fq_ud,OUTPUT);
-  pinMode(sdat,OUTPUT);
-  pinMode(sclk,OUTPUT);
-  pinMode(reset,OUTPUT);
+//  pinMode(fq_ud,OUTPUT);
+//  pinMode(sdat,OUTPUT);
+//  pinMode(sclk,OUTPUT);
+//  pinMode(reset,OUTPUT);`
   
-
+  Serial.println(hfbands[0][3]);
 
   // Set up analog inputs on A0 and A1, internal reference voltage
   pinMode(A0,INPUT);
@@ -178,13 +180,26 @@ void setup() {
       // as it makes device useful without controls
       // just press reset on Nano to restart measurement and clear minimum values
   Serial.println("Sweeping bands ");
-//  Sweep_bands();
+  Sweep_bands();
   Serial.println("Reporting bands ");
-//  Sweep_report();
+  Sweep_report();
   Serial.println("Sweeping and reporting done !");
+
+  screen.setCursor(0,0);
+  screen.fillRect(0,0,150,10,ST7735_BLACK);
+  screen.print("Min. VSWR ");
+  for (int j=0; j <8; j++)
+  {
+    screen.setCursor(0,20+10*j);
+    screen.fillRect(0,20+10*j,120,10,ST7735_BLACK);
+    screen.print(swr_results[j][1],3); 
+    screen.setCursor(90,20+10*j);
+    screen.println(swr_results[j][0]);
+
+  }
   
   screen.setCursor(0,100);
-  screen.println("Which band ?");
+  screen.print("Which band ?  ");
   int temp_bandno = 0;
   while(CheckJoystick()!= Press)
   {
@@ -455,13 +470,19 @@ void Perform_sweep(int j){
 // Check the joystick position
 int CheckJoystick()
 {
-  int joystickState = analogRead(2);
-  
+  int joystickState = analogRead(3);
+//  Serial.println(joystickState);
+//  if (joystickState < 50) return Left;
+//  if (joystickState < 150) return Down;
+//  if (joystickState < 250) return Press;
+//  if (joystickState < 500) return Right;
+//  if (joystickState < 650) return Up;
+    
   if (joystickState < 50) return Left;
-  if (joystickState < 150) return Down;
-  if (joystickState < 250) return Press;
-  if (joystickState < 500) return Right;
-  if (joystickState < 650) return Up;
+  if (joystickState < 200) return Down;
+  if (joystickState < 500) return Press;
+  if (joystickState < 600) return Right;
+  if (joystickState < 950) return Up;
   return Neutral;
 }
 
