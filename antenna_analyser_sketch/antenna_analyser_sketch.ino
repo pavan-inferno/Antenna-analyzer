@@ -16,7 +16,7 @@ by pavan.inferno
 
 
 //TFT screen pins
-#define cs_tft   10 // 7 not default, this involves some soldering on the TFT shield
+#define cs_tft   7 // 7 not default, this involves some soldering on the TFT shield
 #define dc   8
 #define rst  9
 #define mosi 11
@@ -42,11 +42,13 @@ by pavan.inferno
 #define AD9850_CLOCK 125000000         // Module crystal frequency. Tweak here for accuracy.
 
 boolean use_calibration = false;
+boolean plot_band = false;
 
-
-long hfbands [8][4]={
-  {80,3500000,3800000,100}, // wavelength,Fstart,Fstop,nsteps
-  {40,7000000,7200000,100},
+long hfbands [10][4]={
+  {160,1800000,2000000,100},
+  {80,3500000,4000000,100}, // wavelength,Fstart,Fstop,nsteps
+  {60,5330000,5405000,30},
+  {40,7000000,7300000,100},
   {30,10100000,10150000,20},
   {20,14000000,14350000,100},
   {17,18068000,18168000,30},
@@ -86,7 +88,7 @@ int band_choice = 0; // doesn't need to be zeroed as this happens during initial
 
 int graph_array [150];          // storage array for single graph - try storing vswr values as ints (after multiplying by 100) to save memory
 
-uint8_t vswr[sz{0}];
+
 
 #define pulseHigh(pin) {digitalWrite(pin, HIGH); digitalWrite(pin, LOW); }
 
@@ -102,11 +104,11 @@ void setup() {
   //Initialize serial port
   Serial.begin(115200);
 
-  //Configure DDS pins
-//  pinMode(fq_ud,OUTPUT);
-//  pinMode(sdat,OUTPUT);
-//  pinMode(sclk,OUTPUT);
-//  pinMode(reset,OUTPUT);`
+//  Configure DDS pins
+  pinMode(fq_ud,OUTPUT);
+  pinMode(sdat,OUTPUT);
+  pinMode(sclk,OUTPUT);
+  pinMode(reset,OUTPUT);
   
   Serial.println(hfbands[0][3]);
 
@@ -188,7 +190,7 @@ void setup() {
   screen.setCursor(0,0);
   screen.fillRect(0,0,150,10,ST7735_BLACK);
   screen.print("Min. VSWR ");
-  for (int j=0; j <8; j++)
+  for (int j=0; j <10; j++)
   {
     screen.setCursor(0,20+10*j);
     screen.fillRect(0,20+10*j,120,10,ST7735_BLACK);
@@ -198,13 +200,13 @@ void setup() {
 
   }
   
-  screen.setCursor(0,100);
+  screen.setCursor(0,120);
   screen.print("Which band ?  ");
   int temp_bandno = 0;
   while(CheckJoystick()!= Press)
   {
-    screen.fillRect(0,110,40,10,ST7735_BLACK);
-    screen.setCursor(0,110);
+    screen.fillRect(100,120,40,10,ST7735_BLACK);
+    screen.setCursor(100,120);
     screen.print(hfbands[temp_bandno][0]);
     screen.print('m');
     if (CheckJoystick()== Left)
@@ -300,7 +302,7 @@ button_status = "";
 
 void Sweep_bands(){
         
-  for(int i=0;i<=7;i++){
+  for(int i=0;i<=9;i++){
         screen.setCursor(130,20+10*i);
         Serial.print(hfbands[i][0]);
         screen.print(hfbands[i][0]);
@@ -411,14 +413,14 @@ void Perform_sweep(int j){
     
     Serial.print(long((current_freq_MHz-4*Fstep_MHz)*1000000)); // remember that the frequency corresponding to current avg_VSWR was four iterations ago
     Serial.print(",");
-    Serial.println(AVG_VSWR);
-
-    screen.setCursor(0,20+10*j);
-    screen.fillRect(0,20+10*j,120,10,ST7735_BLACK);
-    screen.print(long((current_freq_MHz-4*Fstep_MHz)*1000000)); 
-    screen.setCursor(90,20+10*j);
-    screen.println(AVG_VSWR);
-    
+    Serial.println(AVG_VSWR,4);
+    if(!plot_band){
+      screen.setCursor(0,20+10*j);
+      screen.fillRect(0,20+10*j,120,10,ST7735_BLACK);
+      screen.print(long((current_freq_MHz-4*Fstep_MHz)*1000000)); 
+      screen.setCursor(90,20+10*j);
+      screen.println(AVG_VSWR);
+    }
       // test for minimum VSWR - store and notify if new minimum found
       if((AVG_VSWR<swr_results[j][0])||(swr_results[j][0]==0)){
          swr_results[j][0]=AVG_VSWR;
@@ -472,17 +474,17 @@ int CheckJoystick()
 {
   int joystickState = analogRead(3);
 //  Serial.println(joystickState);
-//  if (joystickState < 50) return Left;
-//  if (joystickState < 150) return Down;
-//  if (joystickState < 250) return Press;
-//  if (joystickState < 500) return Right;
-//  if (joystickState < 650) return Up;
-    
   if (joystickState < 50) return Left;
-  if (joystickState < 200) return Down;
-  if (joystickState < 500) return Press;
-  if (joystickState < 600) return Right;
-  if (joystickState < 950) return Up;
+  if (joystickState < 150) return Down;
+  if (joystickState < 250) return Press;
+  if (joystickState < 500) return Right;
+  if (joystickState < 650) return Up;
+    
+//  if (joystickState < 50) return Left;
+//  if (joystickState < 200) return Down;
+//  if (joystickState < 500) return Press;
+//  if (joystickState < 600) return Right;
+//  if (joystickState < 950) return Up;
   return Neutral;
 }
 
@@ -508,10 +510,10 @@ double Get_VSWR(){
     FWD=FWD5/5;  //   carry out averaging calc
     REV=REV5/5;
 
-    Serial.print(FWD);
-    Serial.print(',');
-    Serial.print(REV);
-    Serial.print(',');
+//    Serial.print(FWD);
+//    Serial.print(',');
+//    Serial.print(REV);
+//    Serial.print(',');
    
     if(REV>=FWD){
       // To avoid a divide by zero or negative VSWR then set to 0
