@@ -138,7 +138,7 @@ void setup() {
     
     // Set DDS to current frequency
     SetDDSFreq(adjFreq*1000000);
-
+    delay(50);
     if (CheckJoystick()== Left)
       adjFreq--;
     if (CheckJoystick()== Right)
@@ -413,7 +413,7 @@ void Perform_sweep(int j){
     
     Serial.print(long((current_freq_MHz-4*Fstep_MHz)*1000000)); // remember that the frequency corresponding to current avg_VSWR was four iterations ago
     Serial.print(",");
-    Serial.println(AVG_VSWR,4);
+    Serial.println(AVG_VSWR,7);
     if(!plot_band){
       screen.setCursor(0,20+10*j);
       screen.fillRect(0,20+10*j,120,10,ST7735_BLACK);
