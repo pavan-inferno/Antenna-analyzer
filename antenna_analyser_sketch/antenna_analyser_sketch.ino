@@ -42,7 +42,7 @@ by pavan.inferno
 #define AD9850_CLOCK 125000000         // Module crystal frequency. Tweak here for accuracy.
 
 boolean use_calibration = false;
-boolean plot_band = false;
+boolean plot_band = true;
 
 long hfbands [10][4]={
   {160,1800000,2000000,100},
@@ -56,6 +56,7 @@ long hfbands [10][4]={
   {12,24890000,24990000,30},
   {10,28000000,29700000,100}
 };
+long mp_band[10];
 
 double swr_results [11][4]={
   
@@ -63,13 +64,13 @@ double swr_results [11][4]={
   // separate array from hfbands
   // because this stores floats
   
-  {0,0,3.500,0.660},  // correction needs to be measured for 160 m
-  {0,0,3.548,0.623},
-  {0,0,3.575,0.590},  // ditto for 60 m 
-  {0,0,3.609,0.570},                        
-  {0,0,3.696,0.500},                        
-  {0,0,3.758,0.413},
-  {0,0,3.767,0.257},
+  {0,0,4.4167,0.8015},  // correction needs to be measured for 160 m
+  {0,0,4.529,0.8599},
+  {0,0,4.5922,0.9774},  // ditto for 60 m 
+  {0,0,4.9884,1.2783},                        
+  {0,0,5.4176,1.7267},                        
+  {0,0,6.2202,2.6581},
+  {0,0,7.3635,3.8858},
   {0,0,3.804,0.187},
   {0,0,3.818,0.118},
   {0,0,3.754,0.050},
@@ -78,16 +79,21 @@ double swr_results [11][4]={
 
 boolean sweepAbort = LOW;
 
+double temp_swr;
+
+double xmin,xmax,ymin,ymax,swrmin;
 
 double moving_avg_swr [9];        // nine-point moving average for VSWR
 double Fstart_MHz = 1;  // Start Frequency for sweep
 double Fstop_MHz = 10;  // Stop Frequency for sweep
+double Fstep_MHz = 0;
 double current_freq_MHz; // Temp variable used during sweep
 int num_steps = 100; // Number of steps to use in the sweep
 int band_choice = 0; // doesn't need to be zeroed as this happens during initial sweep - used for single band sweeps and graph plotting
 
-int graph_array [150];          // storage array for single graph - try storing vswr values as ints (after multiplying by 100) to save memory
-
+int graph_array [100];          // storage array for single graph - try storing vswr values as ints (after multiplying by 100) to save memory
+int temp_bandno = 0;
+int min_point  = 0;
 
 
 #define pulseHigh(pin) {digitalWrite(pin, HIGH); digitalWrite(pin, LOW); }
@@ -110,7 +116,7 @@ void setup() {
   pinMode(sclk,OUTPUT);
   pinMode(reset,OUTPUT);
   
-  Serial.println(hfbands[0][3]);
+//  Serial.println(hfbands[0][3]);
 
   // Set up analog inputs on A0 and A1, internal reference voltage
   pinMode(A0,INPUT);
@@ -123,6 +129,25 @@ void setup() {
   pulseHigh(sclk);
   pulseHigh(fq_ud);    // this pulse enables serial mode - Datasheet page 12 figure 10  
 
+
+// Sweep all midpoints of bands
+//  for (int i=0; i<10; i++)
+//  {
+//  mp_band[i] = (hfbands[i][1] + hfbands[i][2])/2;
+//
+//  SetDDSFreq(mp_band[i]);
+//  delay(550);
+//  temp_swr = Get_VSWR();
+//  for (int j = 0; j<9; j++)
+//  {
+//    temp_swr = (temp_swr + Get_VSWR());
+//    delay(50);
+//  }
+//  Serial.println(temp_swr/10.0,7);
+//  }
+
+
+  
   //Initialize screen
   screen.initR(INITR_BLACKTAB);   // initialize a ST7735S chip, black tab
   screen.fillScreen(ST7735_BLACK);
@@ -181,78 +206,45 @@ void setup() {
   // On power-up, sweep Amateur HF bands 80m to 10m
       // as it makes device useful without controls
       // just press reset on Nano to restart measurement and clear minimum values
-  Serial.println("Sweeping bands ");
-  Sweep_bands();
-  Serial.println("Reporting bands ");
-  Sweep_report();
-  Serial.println("Sweeping and reporting done !");
+//  Serial.println("Sweeping bands ");
+//  Sweep_bands();
+//  Serial.println("Reporting bands ");
+//  Sweep_report();
+//  Serial.println("Sweeping and reporting done !");
+//
+//  screen.setCursor(0,0);
+//  screen.fillRect(0,0,150,10,ST7735_BLACK);
+//  screen.print("Min. VSWR ");
+//  for (int j=0; j <1; j++)
+//  {
+//    screen.setCursor(0,20+10*j);
+//    screen.fillRect(0,20+10*j,120,10,ST7735_BLACK);
+//    screen.print(swr_results[j][1],3); 
+//    screen.setCursor(90,20+10*j);
+//    screen.println(swr_results[j][0]);
+//
+//  }
+//  
+//  screen.setCursor(0,120);
+//  screen.print("Which band ?  ");
+//  while(CheckJoystick()!= Press)
+//  {
+//    screen.fillRect(100,120,40,10,ST7735_BLACK);
+//    screen.setCursor(100,120);
+//    screen.print(hfbands[temp_bandno][0]);
+//    screen.print('m');
+//    if (CheckJoystick()== Left)
+//      temp_bandno--;
+//    if (CheckJoystick()== Right)
+//      temp_bandno++;
+//    delay(200);
+//    if (temp_bandno==8)
+//      temp_bandno=0;
+//    if (temp_bandno==-1)
+//      temp_bandno=7;
+//  }
 
-  screen.setCursor(0,0);
-  screen.fillRect(0,0,150,10,ST7735_BLACK);
-  screen.print("Min. VSWR ");
-  for (int j=0; j <10; j++)
-  {
-    screen.setCursor(0,20+10*j);
-    screen.fillRect(0,20+10*j,120,10,ST7735_BLACK);
-    screen.print(swr_results[j][1],3); 
-    screen.setCursor(90,20+10*j);
-    screen.println(swr_results[j][0]);
-
-  }
-  
-  screen.setCursor(0,120);
-  screen.print("Which band ?  ");
-  int temp_bandno = 0;
-  while(CheckJoystick()!= Press)
-  {
-    screen.fillRect(100,120,40,10,ST7735_BLACK);
-    screen.setCursor(100,120);
-    screen.print(hfbands[temp_bandno][0]);
-    screen.print('m');
-    if (CheckJoystick()== Left)
-      temp_bandno--;
-    if (CheckJoystick()== Right)
-      temp_bandno++;
-    delay(200);
-    if (temp_bandno==8)
-      temp_bandno=0;
-    if (temp_bandno==-1)
-      temp_bandno=7;
-  }
-
-  //Set black background
-  screen.fillScreen(ST7735_BLACK);
-  
-  //Setting text attributes
-  screen.setTextSize(0);
-  screen.setTextColor(ST7735_YELLOW);
-
-  //Draw the line to separate plot window
-  screen.drawFastHLine(0,10,screen.width(),ST7735_BLUE);
-  
-  //Draw plot border
-  screen.drawRect(15,10+2,screen.width()-15,screen.height()-20,ST7735_RED);
-
-  //Plot axes labels 
-  screen.setTextColor(ST7735_GREEN);
-  
-  screen.setCursor(0,screen.height()-20);
-  screen.print(y_min,1);
-
-  screen.setCursor(0,screen.height()/2);
-  screen.print(0.5*(y_min+y_max),1);
-  
-  screen.setCursor(0,20);
-  screen.print(y_max,1);
-
-  screen.setCursor(10,screen.height()-10);
-  screen.print(x_min,1);
-
-  screen.setCursor(screen.width()/2-10,screen.height()-10);
-  screen.print(0.5*(x_min+x_max),1);
-  
-  screen.setCursor(screen.width()-30,screen.height()-10);
-  screen.print(x_max,1);
+Plot_band(temp_bandno);
   
 }
 
@@ -300,20 +292,30 @@ button_status = "";
  
 }
 
+void Plot_band(int j)
+{
+
+  Perform_sweep(j);
+  plot_template(int(ymin*100), int(ymax*100));
+  autoscaled_plot(int(ymin*100), int(ymax*100));
+  if (!plot_band)
+  {
+  plot_template(int(ymin*100), int(ymax*100));
+  autoscaled_plot(int(ymin*100), int(ymax*100));
+  }
+}
+
 void Sweep_bands(){
         
-  for(int i=0;i<=9;i++){
+  for(int i=0;i<=0;i++){
         screen.setCursor(130,20+10*i);
         Serial.print(hfbands[i][0]);
         screen.print(hfbands[i][0]);
         Serial.println('m');
         screen.print('m');
         
-        Fstart_MHz = ((double)hfbands[i][1])/1000000;
-        Fstop_MHz = ((double)hfbands[i][2])/1000000;
-        num_steps = hfbands[i][3];
         
-        band_choice=i;  // needed to ensure correct calibration factors are applied for band
+
         
         // need to pass current minimum VSWR & freq to sweep routine
         // easiest to use array subscript
@@ -332,40 +334,8 @@ void Sweep_report(){
   
   char minvswr[6];
   char minfreqdisp[16];
-  
-      // now put it on the OLED screen
-      // convert the numbers to strings...
- //     dtostrf(current_freq_MHz-4*Fstep_MHz,6,3,freqdisp);
- //     dtostrf(AVG_VSWR,5,2,vswrdisp);
-      // min values over entire range / any bands
- //     dtostrf(swr_results[8][1],6,3,minfreqdisp);
- //     dtostrf(swr_results[8][0],5,2,minvswr);
-    
-      // then display them with a 'picture loop'
-//      u8g.firstPage();
-//      do {
-//        u8g.setFont(u8g_font_5x7);
-//        u8g.drawStr(0,8,"80m:       @        MHz");
-//        u8g.drawStr(0,16,"40m:       @        MHz");
-//        u8g.drawStr(0,24,"30m:       @        MHz"); 
-//        u8g.drawStr(0,32,"20m:       @        MHz");
-//        u8g.drawStr(0,40,"17m:       @        MHz");
-//        u8g.drawStr(0,48,"15m:       @        MHz");
-//        u8g.drawStr(0,56,"12m:       @        MHz");
-//        u8g.drawStr(0,64,"10m:       @        MHz");
-//        
-//        // populate table with min VSWR values for each band
-//        
-//        for(int i=0;i<8;i++){
-//          dtostrf(swr_results[i][1],6,3,minfreqdisp);
-//          dtostrf(swr_results[i][0],5,2,minvswr); 
-//          u8g.drawStr(24,(8*(i+1)),minvswr);
-//          u8g.drawStr(64,(8*(i+1)),minfreqdisp);
-//        }
-//        
-//        } while(u8g.nextPage() );
-        
 }
+
 void Perform_sweep(int j){
   char freqdisp[16];
   char vswrdisp[16];
@@ -373,13 +343,31 @@ void Perform_sweep(int j){
   char minvswr[6];
   char minfreqdisp[16];
   int avg_ctr=0;  // counter for moving average (over frequency) array
+  int y_min,y_max;
 
+  y_min = 100;
+  y_max = 300;
+
+  Fstart_MHz = ((double)hfbands[j][1])/1000000;
+  Fstop_MHz = ((double)hfbands[j][2])/1000000;
+  num_steps = hfbands[j][3];
+  Fstep_MHz = (Fstop_MHz-Fstart_MHz)/num_steps;
+
+  xmax = Fstop_MHz;
+  xmin = Fstart_MHz;
+  ymax = 0;
+  
   double AVG_VSWR;
-  double Fstep_MHz = (Fstop_MHz-Fstart_MHz)/num_steps;
+
   
   swr_results[j][0]=0;  // clear stored minimum for this band choice
   swr_results[j][1]=0;
- 
+  band_choice=j;  // needed to ensure correct calibration factors are applied for band
+
+  if (plot_band){
+    plot_template(y_min,y_max);
+
+  }
   memset(graph_array,0,sizeof(graph_array));  // zero graphng array
 
   // Start loop 
@@ -403,35 +391,57 @@ void Perform_sweep(int j){
     AVG_VSWR=(moving_avg_swr[0]+moving_avg_swr[1]+moving_avg_swr[2]+moving_avg_swr[3]+moving_avg_swr[4]+moving_avg_swr[5]+moving_avg_swr[6]+moving_avg_swr[7]+moving_avg_swr[8])/9;
  
     // Send current line back to PC over serial bus - this may cause problems for interrupts but there's no reason to be using these to read encoder during a sweep
-    
+    AVG_VSWR = swr_results[j][2]*log(AVG_VSWR) - swr_results[j][3];
     if(i>=8){    // VSWR values only valid after 8 measurements have been processed
  
     // load value into graph array if it doesn't overflow
-    if(i<158){
+    if(i<108){
       graph_array[i-8]=int(AVG_VSWR*100);
     }
+
     
-    Serial.print(long((current_freq_MHz-4*Fstep_MHz)*1000000)); // remember that the frequency corresponding to current avg_VSWR was four iterations ago
-    Serial.print(",");
-    Serial.println(AVG_VSWR,7);
+
     if(!plot_band){
       screen.setCursor(0,20+10*j);
       screen.fillRect(0,20+10*j,120,10,ST7735_BLACK);
       screen.print(long((current_freq_MHz-4*Fstep_MHz)*1000000)); 
       screen.setCursor(90,20+10*j);
       screen.println(AVG_VSWR);
+    Serial.print(long((current_freq_MHz-4*Fstep_MHz)*1000000)); // remember that the frequency corresponding to current avg_VSWR was four iterations ago
+    Serial.print(",");
+    Serial.println(AVG_VSWR,7);
+    }
+    else
+    {
+      screen.drawPixel(8 + i, map(graph_array[i-8],y_min,y_max,screen.height()-20,13), ST7735_WHITE);
+      screen.fillRect(0,0,40,10,ST7735_BLACK);
+      screen.setCursor(0,0);
+      screen.print(AVG_VSWR,4);
+
+      
+      screen.fillRect(50,0,50,10,ST7735_BLACK);
+      screen.setCursor(50,0);
+      screen.print(long((current_freq_MHz-4*Fstep_MHz)*1000000));
+
     }
       // test for minimum VSWR - store and notify if new minimum found
       if((AVG_VSWR<swr_results[j][0])||(swr_results[j][0]==0)){
          swr_results[j][0]=AVG_VSWR;
          swr_results[j][1]=current_freq_MHz-4*Fstep_MHz;  // remember to subtract 4 bin offset for 9 pt moving average
+         ymin = AVG_VSWR;
+         min_point = i-8;
         }
+      // test for maximum VSWR 
+      if((AVG_VSWR>ymax)||(ymax==0)){
+        ymax=AVG_VSWR;
+        }
+
       // test for minimum VSWR over any sweep - note sure if row [8] of this array is actually used any more - legacy code?
       if((AVG_VSWR<swr_results[8][0])||(swr_results[8][0]==0)){
         swr_results[8][0]=AVG_VSWR;
         swr_results[8][1]=current_freq_MHz-4*Fstep_MHz;  // remember to subtract 4 bin offset for 9 pt moving average
         }
-    
+     
     
       // now put it on the OLED screen
       // convert the numbers to strings...
@@ -440,26 +450,7 @@ void Perform_sweep(int j){
       // min values over entire range / any bands
       dtostrf(swr_results[j][1],6,3,minfreqdisp);
       dtostrf(swr_results[j][0],5,2,minvswr);
-      
-      // these last two lines used to display [8] instead of [j] - not useful on a single band sweep
-    
-      // then display them with a 'picture loop'
-//      u8g.firstPage();
-//      do {
-//        u8g.setFont(u8g_font_7x13);
-//        u8g.drawStr(0,15,"Sweeping frequency");
-//        u8g.drawStr(0,30,"Freq:       MHz");
-//        u8g.drawStr(0,45,"VSWR: "); 
-//        u8g.drawStr(40,30,freqdisp);
-//        u8g.drawStr(40,45,vswrdisp);
-//
-//        u8g.setFont(u8g_font_6x13);
-//        u8g.drawStr(0,60,"Min       @       MHz");
-//        u8g.drawStr(24,60,minvswr);
-//        u8g.drawStr(70,60,minfreqdisp);
-//      
-//        //u8g.drawStr(90,30,"MHz");
-//        } while(u8g.nextPage() );
+
     
       }
     
@@ -468,6 +459,98 @@ void Perform_sweep(int j){
       
   }
     
+}
+
+//Plot template window
+void plot_template (int y_min, int y_max){
+      screen.fillScreen(ST7735_BLACK);
+      //Draw plot border
+    screen.drawRect(15,10+2,102,screen.height()-20,ST7735_RED);
+      //Setting text attributes
+    screen.setTextSize(0);
+    screen.setTextColor(ST7735_YELLOW);
+  
+    //Draw the line to separate plot window
+    screen.drawFastHLine(0,10,screen.width(),ST7735_BLUE);
+   
+    //Plot axes labels 
+    screen.setTextColor(ST7735_GREEN);
+    screen.setCursor(0,screen.height()-12);
+    screen.print(y_min);
+
+    //labels
+    screen.setCursor(40,0);
+    screen.print('@');
+    screen.setCursor(100,0);
+    screen.print("Hz");
+
+            //Band name
+    screen.setCursor(screen.width()-30, 0);
+    screen.print(hfbands[band_choice][0]);
+    screen.println('m');
+    
+    screen.setCursor(0,screen.height()/2-10);
+    screen.println("SWR");
+    screen.println("x");
+    screen.println("100");
+    
+    screen.setCursor(0,12);
+    screen.print(y_max);
+  
+    screen.setCursor(10,screen.height()-7);
+    screen.print(xmin,1);
+  
+    screen.setCursor(50,screen.height()-7);
+    screen.print("MHz");
+    
+    screen.setCursor(100,screen.height()-7);
+    screen.print(xmax,1);
+}
+
+
+void autoscaled_plot(int y_min, int y_max){
+      for (int i=0; i<100; i++)
+      {
+      screen.drawPixel(16+i, map(graph_array[i],y_min,y_max,screen.height()-20,13), ST7735_WHITE);
+      }
+
+
+      
+      screen.fillRect(0,0,40,10,ST7735_BLACK);
+      screen.setCursor(120,20);
+      screen.print("Min:");
+      screen.setCursor(120,40);
+      screen.print(swr_results[band_choice][0],4);
+      
+      screen.setCursor(120,50);
+      screen.print('@');
+      screen.setCursor(120,60);
+      screen.print(long(swr_results[band_choice][1]*1000000));
+
+      int i = min_point;
+      while(CheckJoystick()!= Press)
+        {
+
+          screen.fillRect(50,0,50,10,ST7735_BLACK);
+          screen.fillRect(0,0,40,10,ST7735_BLACK);
+          screen.drawLine(16+i,13,16+i,17,ST7735_BLACK);
+          
+          delay(50);
+          if ((CheckJoystick()== Left)&&(i>0))
+            i--;
+          if ((CheckJoystick()== Right)&&(i<num_steps))
+            i++;
+          // Wait a little for settling - needs to be at least 50 ms (see update info at start)
+          //delay();
+          screen.drawLine(16+i,13,16+i,17,ST7735_YELLOW);
+          
+          screen.setCursor(0,0);
+          screen.print(graph_array[i]/100.0,4);
+
+          screen.setCursor(50,0);
+          screen.print(long((Fstart_MHz + i*Fstep_MHz)*1000000));
+       
+        }
 }
 // Check the joystick position
 int CheckJoystick()
